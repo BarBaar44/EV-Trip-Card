@@ -2,7 +2,7 @@
 
 One Lovelace card for [Home-Assistant-EV-Scheduler](https://github.com/BarBaar44/Home-Assistant-EV-Scheduler-): see the charging plan, book a trip, move or cancel it.
 
-* **Status:** battery, car charge limit, and the plan published to evcc ("85% by Tue 07:15").
+* **Status:** battery, car charge limit, and what the next trip needs ("85% by Tue 07:15"). This is the requirement HA publishes, not a readout of evcc.
 * **Banner:** messages from `sensor.tesla_trip_form_status`, with Dismiss.
 * **Plan a trip:** search, pick a result, set the time, Schedule. The Search button works on phones too, because the card reads the text from its own field instead of an `input_text` helper.
 * **Upcoming trips:** Move or Cancel per trip. Hidden when there are none.

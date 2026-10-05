@@ -12,7 +12,7 @@
  * https://github.com/BarBaar44/ev-trip-card  (MIT)
  */
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 
 const DEFAULTS = {
   title: "Trips and charging",
@@ -263,7 +263,7 @@ class EvTripCard extends HTMLElement {
       </div>
       <div class="stat wide">
         <div class="stat-value ${planClass}">${esc(plan)}</div>
-        <div class="stat-label">charging plan</div>
+        <div class="stat-label">needed for next trip</div>
       </div>
     `;
   }
