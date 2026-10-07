@@ -115,10 +115,6 @@ user is refused.
 
 ## pyscript adapter notes
 
-* The pyscript apps also keep their old entities and services
-  (`sensor.tesla_trip_form_status`, `sensor.manual_trip_options`,
-  `schedule_manual_trip`, …) so the current UI dashboard keeps working.
-  Remove them once the card has replaced it.
 * pyscript entities made with `state.set()` vanish on a restart. The
   apps recreate them at startup (status, search) or on their next run
   (trips at startup, plan within 5 minutes).

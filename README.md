@@ -41,9 +41,9 @@ All options are optional:
 | `show_status` | `true` |
 | `show_manage` | `true` |
 
-## Not needed with this card
+## Replaces the old UI dashboard
 
-`input_text.manual_trip_location`, the "search on Enter" automation, `input_datetime.manual_trip_datetime`, `input_select.manual_trip_destination`, `input_select.manual_trip_to_cancel` and the submit, cancel and reschedule scripts. The pyscript apps still write some of these helpers for the old dashboard, so leave them in place until that is gone.
+From pyscript contract version 1 (7 Oct 2026) the apps no longer use the old form helpers, so these can be deleted in HA: `input_text.manual_trip_location`, `input_boolean.manual_trip_one_way`, `input_datetime.manual_trip_datetime`, `input_select.manual_trip_destination`, `input_select.manual_trip_to_cancel`, the submit, move, cancel and search scripts, and the "search on Enter" automation. Keep the `next_trip_*` helpers: the evcc automation reads them.
 
 ## Licence
 
