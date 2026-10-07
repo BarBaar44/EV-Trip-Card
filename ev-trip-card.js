@@ -18,7 +18,7 @@
  * https://github.com/BarBaar44/ev-trip-card  (MIT)
  */
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 const DEFAULTS = {
   title: "Trips and charging",
@@ -36,6 +36,18 @@ const DEFAULTS = {
   show_status: true,
   show_manage: true,
   show_arrive_by: true,
+  // Picture of the car, e.g. /local/calimero.png. A plain outline otherwise.
+  image: null,
+};
+
+// sensor.<car>_charging states (Tesla Fleet) in words.
+const CHARGING_TEXT = {
+  charging: "Charging",
+  complete: "Charged",
+  stopped: "Plugged in, not charging",
+  starting: "Starting to charge",
+  no_power: "Plugged in, no power",
+  disconnected: "Not plugged in",
 };
 
 // Contract service name -> [domain, service] per backend.
@@ -151,6 +163,23 @@ class EvTripCard extends HTMLElement {
     }
   }
 
+  // "today 17:58", "tomorrow 07:00", or "Fri 9 Oct, 07:00".
+  _fmtRelative(date) {
+    const lang = (this._hass && this._hass.locale && this._hass.locale.language) || undefined;
+    const day = this._wall(date).slice(0, 10);
+    const today = this._wall(new Date()).slice(0, 10);
+    const tomorrow = this._wall(new Date(Date.now() + 86400 * 1000)).slice(0, 10);
+    let time;
+    try {
+      time = date.toLocaleTimeString(lang, { timeZone: this._tz, hour: "2-digit", minute: "2-digit" });
+    } catch (e) {
+      return this._fmt(date);
+    }
+    if (day === today) return `today ${time}`;
+    if (day === tomorrow) return `tomorrow ${time}`;
+    return this._fmt(date);
+  }
+
   // ------------------------------------------------------------------
   // Static skeleton, built once so inputs keep focus and typed text
   // ------------------------------------------------------------------
@@ -161,7 +190,12 @@ class EvTripCard extends HTMLElement {
       <ha-card>
         <div class="header">${esc(c.title)}</div>
 
-        <div class="status" id="status" ${c.show_status ? "" : "hidden"}></div>
+        <div class="status" id="status" ${c.show_status ? "" : "hidden"}>
+          <div class="status-text" id="status-text"></div>
+          <div class="car" id="car">${
+            c.image ? `<img src="${esc(c.image)}" alt="" />` : CAR_SVG
+          }</div>
+        </div>
 
         <div class="banner" id="banner" hidden>
           <span class="banner-text" id="banner-text"></span>
@@ -205,7 +239,7 @@ class EvTripCard extends HTMLElement {
 
     const $ = (id) => this.shadowRoot.getElementById(id);
     this._el = {
-      status: $("status"),
+      status: $("status-text"),
       banner: $("banner"),
       bannerText: $("banner-text"),
       query: $("query"),
@@ -268,48 +302,81 @@ class EvTripCard extends HTMLElement {
     const raised = s[c.limit_raised_entity];
     const plan = s[c.plan_entity];
 
-    const socText = hasValue(soc) ? `${Math.round(Number(soc.state))}%` : "?";
-    const limitText = hasValue(limit) ? `${Math.round(Number(limit.state))}%` : "?";
-    const chargingText = hasValue(charging) ? charging.state : "";
+    const socNum = hasValue(soc) ? Math.round(Number(soc.state)) : null;
+    const limitNum = hasValue(limit) ? Math.round(Number(limit.state)) : null;
+    const chargingText = hasValue(charging)
+      ? CHARGING_TEXT[charging.state] || charging.state
+      : "";
     const raisedOn = raised && raised.state === "on";
 
-    let planText = "Plan not known yet";
-    let planLabel = "needed for the next trip";
-    let planMuted = true;
+    // The plan: a headline (what to do) and a line under it (why, when).
+    let target = null;
+    let head = "Plan not known yet";
+    let sub = "";
+    let tone = "muted"; // muted | ok | todo
     if (hasValue(plan)) {
       const a = plan.attributes;
       const when = a.deadline ? new Date(a.deadline) : null;
-      if (a.kind === "trip" && when) {
-        planText = `${Math.ceil(Number(plan.state))}% by ${this._fmt(when)}`;
-        const km = a.km != null ? ` (${Math.round(a.km)} km)` : "";
-        planLabel = `needed for ${a.place || "the next trip"}${km}`;
-        planMuted = false;
-      } else if (a.kind === "floor" && when) {
-        planText = `${Math.ceil(Number(plan.state))}% by ${this._fmt(when)}`;
-        planLabel = "battery floor, no trip needs more";
-        planMuted = false;
+      const kind = when ? a.kind : "idle";
+      if (kind === "trip" || kind === "floor") {
+        target = Math.min(100, Math.ceil(Number(plan.state)));
+        const ready = socNum != null && socNum >= target;
+        // The planner clamps a late deadline to now: say so plainly.
+        const by = when.getTime() <= Date.now() + 60 * 1000 ? "now" : `by ${this._fmtRelative(when)}`;
+        const km = a.km != null ? `${Math.round(a.km)} km` : "";
+        if (kind === "trip") {
+          const place = a.place || "the next trip";
+          head = ready ? `Ready for ${place}` : `Charge to ${target}% ${by}`;
+          sub = ready
+            ? [`needs ${target}%`, km].filter(Boolean).join(" · ")
+            : [`for ${place}`, km].filter(Boolean).join(" · ");
+        } else {
+          head = ready ? `Above the ${target}% floor` : `Charge to ${target}% ${by}`;
+          sub = ready ? "no trip needs more" : "battery floor, no trip needs more";
+        }
+        tone = ready ? "ok" : "todo";
       } else {
-        planText = "No trips planned";
+        head = "No trips planned";
       }
     }
 
-    const key = JSON.stringify([socText, limitText, chargingText, raisedOn, planText, planLabel]);
+    const key = JSON.stringify([socNum, limitNum, chargingText, raisedOn, target, head, sub]);
     if (key === this._statusKey) return;
     this._statusKey = key;
 
-    const badge = raisedOn ? `<span class="badge">raised for trip</span>` : "";
+    const pct = (n) => Math.max(0, Math.min(100, n));
+    const bar =
+      socNum == null
+        ? ""
+        : `
+      <div class="bar" role="img"
+           aria-label="Battery ${socNum}%${limitNum != null ? `, limit ${limitNum}%` : ""}">
+        <div class="bar-fill ${tone}" style="width:${pct(socNum)}%"></div>
+        ${limitNum != null ? `<div class="bar-over" style="left:${pct(limitNum)}%"></div>` : ""}
+        ${target != null ? `<div class="bar-target" style="left:${pct(target)}%"></div>` : ""}
+      </div>`;
+
+    const legend = [
+      target != null ? `<span><i class="key-target"></i>target ${target}%</span>` : "",
+      limitNum != null
+        ? `<span><i class="key-limit"></i>limit ${limitNum}%${
+            raisedOn ? ` <span class="badge">raised</span>` : ""
+          }</span>`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("");
+
     this._el.status.innerHTML = `
-      <div class="stat">
-        <div class="stat-value">${esc(socText)}</div>
-        <div class="stat-label">battery${chargingText ? ` · ${esc(chargingText)}` : ""}</div>
+      <div class="soc">
+        <span class="soc-value">${socNum != null ? `${socNum}%` : "?"}</span>
+        <span class="soc-state">${esc(chargingText)}</span>
       </div>
-      <div class="stat">
-        <div class="stat-value">${esc(limitText)}</div>
-        <div class="stat-label">charge limit ${badge}</div>
-      </div>
-      <div class="stat wide">
-        <div class="stat-value ${planMuted ? "muted" : ""}">${esc(planText)}</div>
-        <div class="stat-label">${esc(planLabel)}</div>
+      ${bar}
+      <div class="legend">${legend}</div>
+      <div class="plan ${tone}">
+        <div class="plan-head">${esc(head)}</div>
+        ${sub ? `<div class="plan-sub">${esc(sub)}</div>` : ""}
       </div>
     `;
   }
@@ -557,6 +624,21 @@ class EvTripCard extends HTMLElement {
   }
 }
 
+// Plain side outline of a saloon, used when no `image` is set.
+const CAR_SVG = `
+<svg viewBox="0 0 240 90" fill="none" stroke="currentColor" stroke-width="2.5"
+     stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+  <path d="M12 62 C12 52 18 47 30 45 L68 40 C84 26 104 18 132 18 C160 18 182 28 200 40
+           L218 44 C228 46 232 52 232 60 L232 64 C232 67 230 68 227 68 L208 68
+           M172 68 L74 68 M38 68 L16 68 C13 68 12 66 12 62 Z" />
+  <path d="M80 40 C94 29 110 24 130 24 L132 40 Z M140 24 C158 25 174 31 188 40 L140 40 Z"
+        opacity="0.6" />
+  <circle cx="56" cy="68" r="15" />
+  <circle cx="190" cy="68" r="15" />
+  <circle cx="56" cy="68" r="6" opacity="0.6" />
+  <circle cx="190" cy="68" r="6" opacity="0.6" />
+</svg>`;
+
 const STYLE = `
   :host { display: block; }
   ha-card { padding: 16px; }
@@ -570,14 +652,75 @@ const STYLE = `
     font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;
     color: var(--secondary-text-color); margin-bottom: 8px;
   }
-  .status { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .stat.wide { grid-column: 1 / -1; }
-  .stat-value { font-size: 1.3rem; font-weight: 500; color: var(--primary-text-color); }
-  .stat-value.muted { color: var(--secondary-text-color); font-weight: 400; font-size: 1rem; }
-  .stat-label { font-size: 0.85rem; color: var(--secondary-text-color); }
+  /* Battery row full width; plan lower left, car lower right. */
+  .status {
+    display: grid; grid-template-columns: minmax(0, 1fr) 38%;
+    column-gap: 16px; align-items: end;
+  }
+  .status-text { display: contents; }
+  .soc, .bar, .legend { grid-column: 1 / -1; }
+  .plan { grid-column: 1; align-self: center; }
+  .car { grid-column: 2; margin-top: 10px; color: var(--secondary-text-color); }
+  .car img, .car svg {
+    display: block; width: 100%; max-height: 120px; object-fit: contain;
+  }
+
+  .soc { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .soc-value {
+    font-size: 2.4rem; font-weight: 500; line-height: 1;
+    color: var(--primary-text-color);
+  }
+  .soc-state { font-size: 0.95rem; color: var(--secondary-text-color); }
+
+  .bar {
+    position: relative; height: 10px; margin-top: 12px; border-radius: 5px;
+    background: var(--divider-color); overflow: hidden;
+  }
+  .bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: 5px; }
+  .bar-fill.todo, .bar-fill.muted { background: var(--primary-color); }
+  .bar-fill.ok { background: var(--success-color, #43a047); }
+  /* Above the car's charge limit: hatched, the car will not charge there. */
+  .bar-over {
+    position: absolute; top: 0; bottom: 0; right: 0;
+    background: repeating-linear-gradient(135deg,
+      transparent 0 3px, var(--card-background-color, #1c1c1c) 3px 6px);
+    opacity: 0.6;
+  }
+  .bar-target {
+    position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1px;
+    background: var(--primary-text-color);
+  }
+  .legend {
+    display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px;
+    font-size: 0.8rem; color: var(--secondary-text-color);
+  }
+  .legend i {
+    display: inline-block; vertical-align: middle; margin-right: 5px;
+  }
+  .key-target { width: 3px; height: 10px; background: var(--primary-text-color); }
+  .key-limit {
+    width: 10px; height: 10px; border-radius: 2px; background: var(--divider-color);
+  }
+
+  .plan {
+    margin-top: 14px; padding-left: 10px;
+    border-left: 3px solid var(--plan-color);
+    --plan-color: var(--divider-color);
+  }
+  .plan.todo { --plan-color: var(--primary-color); }
+  .plan.ok { --plan-color: var(--success-color, #43a047); }
+  .plan-head { font-size: 1.1rem; font-weight: 500; color: var(--primary-text-color); }
+  .plan.muted .plan-head { font-weight: 400; color: var(--secondary-text-color); }
+  .plan-sub { font-size: 0.9rem; color: var(--secondary-text-color); margin-top: 2px; }
+
   .badge {
     display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 8px;
     font-size: 0.75rem; background: var(--warning-color, #ff9800); color: #fff;
+  }
+
+  @media (max-width: 340px) {
+    .car { display: none; }
+    .plan { grid-column: 1 / -1; }
   }
 
   .banner {
