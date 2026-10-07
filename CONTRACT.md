@@ -1,11 +1,11 @@
 # EV trip planner contract, version 1
 
-What the card reads and calls. Two backends implement it:
+What the card reads and calls. Backends:
 
 | Backend | Card setting | Services |
 |---|---|---|
-| pyscript apps `trip_scheduler` + `ev_trip_energy` (retired 7 Oct 2026, in the scheduler repo's git history) | `backend: pyscript` (default) | `pyscript.ev_trip_<name>` |
-| EV Trip Planner integration (live since 7 Oct 2026) | `backend: integration` | `ev_trip_planner.<name>` |
+| pyscript apps `trip_scheduler` + `ev_trip_energy` (retired 7 Oct 2026; card support removed in 0.3.0) | none | `pyscript.ev_trip_<name>` |
+| EV Trip Planner integration (live since 7 Oct 2026) | `backend: integration` (default) | `ev_trip_planner.<name>` |
 
 The entity ids below are the defaults. The integration must create the
 same ids, so the card config does not change when the backend does.
@@ -115,9 +115,3 @@ All fields are required unless marked optional.
 `user_id` is the HA user who books the trip (`hass.user.id`). The backend
 maps it to the household member's email and notify service; an unknown
 user is refused.
-
-## pyscript adapter notes
-
-* pyscript entities made with `state.set()` vanish on a restart. The
-  apps recreate them at startup (status, search) or on their next run
-  (trips at startup, plan within 5 minutes).

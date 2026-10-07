@@ -4,9 +4,9 @@
  * destination search, schedule, move, cancel.
  *
  * Talks only to the EV trip planner contract, version 1 (CONTRACT.md):
- * four sensors and seven services. Two backends implement it, the
- * Home-Assistant-EV-Scheduler pyscript apps (`backend: pyscript`, the
- * default) and the planned integration (`backend: integration`).
+ * four sensors and seven services, implemented by the EV Trip Planner
+ * integration (domain ev_trip_planner) from Home-Assistant-EV-Scheduler.
+ * The retired pyscript backend was removed in 0.3.0.
  *
  * The typed text, the picked destination and the date live in the card's
  * own DOM and go straight to the services, so the phone problem where a
@@ -18,11 +18,11 @@
  * https://github.com/BarBaar44/ev-trip-card  (MIT)
  */
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 const DEFAULTS = {
   title: "Trips and charging",
-  backend: "pyscript",
+  backend: "integration",
   // Car side, read only.
   soc_entity: "sensor.calimero_battery_level",
   charge_limit_entity: "number.calimero_charge_limit",
@@ -40,7 +40,6 @@ const DEFAULTS = {
 
 // Contract service name -> [domain, service] per backend.
 const BACKENDS = {
-  pyscript: (name) => ["pyscript", `ev_trip_${name}`],
   integration: (name) => ["ev_trip_planner", name],
 };
 
@@ -80,6 +79,11 @@ class EvTripCard extends HTMLElement {
 
   setConfig(config) {
     const merged = { ...DEFAULTS, ...(config || {}) };
+    if (merged.backend === "pyscript") {
+      throw new Error(
+        "backend: pyscript was removed in 0.3.0; install the EV Trip Planner integration and drop the backend line",
+      );
+    }
     if (!BACKENDS[merged.backend]) {
       throw new Error(`backend must be one of: ${Object.keys(BACKENDS).join(", ")}`);
     }
