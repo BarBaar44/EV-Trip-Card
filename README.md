@@ -2,16 +2,20 @@
 
 One Lovelace card for [Home-Assistant-EV-Scheduler](https://github.com/BarBaar44/Home-Assistant-EV-Scheduler-): see the charging plan, book a trip, move or cancel it.
 
-* **Status:** battery, car charge limit, and what the next trip needs ("85% by Tue 07:15"). This is the requirement HA publishes, not a readout of evcc.
-* **Banner:** messages from `sensor.tesla_trip_form_status`, with Dismiss.
-* **Plan a trip:** search, pick a result, set the time, Schedule. The Search button works on phones too, because the card reads the text from its own field instead of an `input_text` helper.
-* **Upcoming trips:** Move or Cancel per trip. Hidden when there are none.
+* **Status:** battery, car charge limit, and the plan published for the charger ("85% by Tue 07:15, needed for Delft (120 km)", or the battery floor).
+* **Banner:** the planner's messages, with Dismiss.
+* **Plan a trip:** search, pick a result, choose *Leave at* or *Arrive by*, set the time, Schedule. Search works from the phone keyboard and the button alike, because the card reads its own text field.
+* **Upcoming trips:** Move or Cancel per trip, cancel confirmed inline. Hidden when there are none.
 
-The card calls the pyscript services directly (`search_destination`, `schedule_manual_trip`, `reschedule_manual_trip`, `cancel_manual_trip`, `clear_trip_destination`, `clear_trip_form_status`, `set_trip_form_status`). The person who taps Schedule is the organizer, same as the dashboard script.
+The card talks to the **EV trip planner contract** only: four sensors and seven services, described in [CONTRACT.md](CONTRACT.md). Two backends implement it: the pyscript apps (today) and a Home Assistant integration (planned). Switching is one config line. The person who taps Schedule is the one the trip is booked for.
+
+All times are shown and entered in Home Assistant's time zone, not the phone's.
 
 ## Install
 
 HACS > three dots > Custom repositories > add `https://github.com/BarBaar44/ev-trip-card`, type **Dashboard**. Install, then reload the browser.
+
+The pyscript backend needs the `trip_scheduler` and `ev_trip_energy` apps that publish contract version 1 (they provide the `pyscript.ev_trip_*` services).
 
 ## Use
 
@@ -24,22 +28,22 @@ All options are optional:
 | Option | Default |
 |---|---|
 | `title` | `Trips and charging` |
+| `backend` | `pyscript` (or `integration`) |
 | `soc_entity` | `sensor.calimero_battery_level` |
 | `charge_limit_entity` | `number.calimero_charge_limit` |
 | `charging_entity` | `sensor.calimero_charging` |
-| `required_soc_entity` | `input_number.next_trip_required_soc` |
-| `deadline_entity` | `input_datetime.next_trip_deadline` |
 | `limit_raised_entity` | `input_boolean.evcc_car_limit_raised` |
-| `status_entity` | `sensor.tesla_trip_form_status` |
-| `results_entity` | `sensor.manual_trip_destination_results` |
-| `trips_entity` | `sensor.manual_trip_options` |
-| `show_arrive_by` | `false` (turn on once the backend has `arrive_by`) |
+| `plan_entity` | `sensor.ev_trip_planner_plan` |
+| `trips_entity` | `sensor.ev_trip_planner_trips` |
+| `search_entity` | `sensor.ev_trip_planner_search` |
+| `status_entity` | `sensor.ev_trip_planner_status` |
+| `show_arrive_by` | `true` |
 | `show_status` | `true` |
 | `show_manage` | `true` |
 
 ## Not needed with this card
 
-`input_text.manual_trip_location`, the "search on Enter" automation, `input_datetime.manual_trip_datetime`, `input_select.manual_trip_destination` display and the submit, cancel and reschedule scripts. The pyscript apps still write some of these helpers, so leave them in place.
+`input_text.manual_trip_location`, the "search on Enter" automation, `input_datetime.manual_trip_datetime`, `input_select.manual_trip_destination`, `input_select.manual_trip_to_cancel` and the submit, cancel and reschedule scripts. The pyscript apps still write some of these helpers for the old dashboard, so leave them in place until that is gone.
 
 ## Licence
 
