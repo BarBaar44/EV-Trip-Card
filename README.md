@@ -1,6 +1,6 @@
 # EV Trip Card
 
-One Lovelace card for [Home-Assistant-EV-Scheduler](https://github.com/BarBaar44/Home-Assistant-EV-Scheduler-): see the charging plan, book a trip, move or cancel it.
+One Lovelace card for [Home-Assistant-EV-Scheduler](https://github.com/BarBaar44/Home-Assistant-EV-Scheduler): see the charging plan, book a trip, move or cancel it.
 
 * **Status:** battery, car charge limit, and the plan published for the charger ("85% by Tue 07:15, needed for Delft (120 km)", or the battery floor).
 * **Banner:** the planner's messages, with Dismiss.
@@ -15,7 +15,7 @@ All times are shown and entered in Home Assistant's time zone, not the phone's.
 
 HACS > three dots > Custom repositories > add `https://github.com/BarBaar44/ev-trip-card`, type **Dashboard**. Install, then reload the browser.
 
-The pyscript backend needs the `trip_scheduler` and `ev_trip_energy` apps that publish contract version 1 (they provide the `pyscript.ev_trip_*` services).
+The pyscript backend needs the `trip_scheduler` and `ev_trip_energy` apps from [Home-Assistant-EV-Scheduler](https://github.com/BarBaar44/Home-Assistant-EV-Scheduler) (`pyscript/`), which publish contract version 1.
 
 ## Use
 
