@@ -7,7 +7,7 @@ One Lovelace card for [Home-Assistant-EV-Scheduler](https://github.com/BarBaar44
 * **Plan a trip:** search, pick a result, choose *Leave at* or *Arrive by*, set the time, Schedule. Search works from the phone keyboard and the button alike, because the card reads its own text field.
 * **Upcoming trips:** Move or Cancel per trip, cancel confirmed inline. Hidden when there are none.
 
-The card talks to the **EV trip planner contract** only: four sensors and seven services, described in [CONTRACT.md](CONTRACT.md). Two backends implement it: the EV Trip Planner integration (current) and the retired pyscript apps. Switching is one config line. The person who taps Schedule is the one the trip is booked for.
+The card talks to the **EV trip planner contract** only: four sensors and seven services, described in [CONTRACT.md](CONTRACT.md). It is implemented by the EV Trip Planner integration. The person who taps Schedule is the one the trip is booked for.
 
 All times are shown and entered in Home Assistant's time zone, not the phone's.
 
@@ -15,13 +15,12 @@ All times are shown and entered in Home Assistant's time zone, not the phone's.
 
 HACS > three dots > Custom repositories > add `https://github.com/BarBaar44/ev-trip-card`, type **Dashboard**. Install, then reload the browser.
 
-The backend is the EV Trip Planner integration from [Home-Assistant-EV-Scheduler](https://github.com/BarBaar44/Home-Assistant-EV-Scheduler). The default `backend` is still `pyscript` for older setups, so set `backend: integration`.
+Needs the EV Trip Planner integration from [Home-Assistant-EV-Scheduler](https://github.com/BarBaar44/Home-Assistant-EV-Scheduler). The pyscript backend was removed in 0.3.0; a config with `backend: pyscript` shows an error.
 
 ## Use
 
 ```yaml
 type: custom:ev-trip-card
-backend: integration
 ```
 
 All options are optional:
@@ -29,7 +28,7 @@ All options are optional:
 | Option | Default |
 |---|---|
 | `title` | `Trips and charging` |
-| `backend` | `pyscript` (or `integration`) |
+| `backend` | `integration` (the only one since 0.3.0) |
 | `soc_entity` | `sensor.calimero_battery_level` |
 | `charge_limit_entity` | `number.calimero_charge_limit` |
 | `charging_entity` | `sensor.calimero_charging` |
