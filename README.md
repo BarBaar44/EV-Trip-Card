@@ -39,9 +39,27 @@ All options are optional:
 | `search_entity` | `sensor.ev_trip_planner_search` |
 | `status_entity` | `sensor.ev_trip_planner_status` |
 | `image` | none: a plain car outline. Any URL, e.g. `/local/calimero.png` from `/config/www` |
+| `car_card` | none: a whole card in the car's place, wins over `image`. See below |
 | `show_arrive_by` | `true` |
 | `show_status` | `true` |
 | `show_manage` | `true` |
+
+## A 3D car
+
+`car_card` hosts any card in the car slot. With [Tesla View](https://github.com/koenhendriks/tesla-view) (its own HACS integration plus card, and an asset pack you extract yourself with [tesla-model-extractor](https://github.com/koenhendriks/tesla-model-extractor)):
+
+```yaml
+type: custom:ev-trip-card
+backend: integration
+car_card:
+  type: custom:tesla-view-card
+  device_id: <the car's Tesla Fleet device>
+  camera: parked
+  hotspots: false
+  aspect_ratio: "16:9"
+```
+
+Every other key goes straight to Tesla View, so its own README is the reference. The slot is about 40% of the card wide, so keep the camera fixed and hotspots off.
 
 ## Replaces the old UI dashboard
 

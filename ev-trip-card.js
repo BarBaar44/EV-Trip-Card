@@ -38,6 +38,9 @@ const DEFAULTS = {
   show_arrive_by: true,
   // Picture of the car, e.g. /local/calimero.png. A plain outline otherwise.
   image: null,
+  // A whole card in the car's place, e.g. { type: "custom:tesla-view-card", ... }.
+  // Wins over `image`.
+  car_card: null,
 };
 
 // sensor.<car>_charging states (Tesla Fleet) in words.
@@ -84,6 +87,7 @@ class EvTripCard extends HTMLElement {
     this._busy = false;
     this._awaitReset = 0; // token of the schedule call waiting for a reset
     this._arriveBy = false;
+    this._carCard = null;
   }
 
   static getStubConfig() {
@@ -92,6 +96,9 @@ class EvTripCard extends HTMLElement {
 
   setConfig(config) {
     const merged = { ...DEFAULTS, ...(config || {}) };
+    if (merged.car_card && (typeof merged.car_card !== "object" || !merged.car_card.type)) {
+      throw new Error("car_card needs a card config with a type");
+    }
     if (!BACKENDS[merged.backend]) {
       throw new Error(`backend must be one of: ${Object.keys(BACKENDS).join(", ")}`);
     }
@@ -111,7 +118,30 @@ class EvTripCard extends HTMLElement {
   set hass(hass) {
     this._hass = hass;
     if (!this._built) this._build();
+    if (this._carCard) this._carCard.hass = hass;
     this._update();
+  }
+
+  // Host another card (Tesla View, a picture card) in the car slot, the way
+  // stack cards do, so this card carries no dependency on it.
+  async _mountCarCard(slot, cfg) {
+    let el;
+    try {
+      if (window.loadCardHelpers) {
+        el = (await window.loadCardHelpers()).createCardElement(cfg);
+      } else {
+        el = document.createElement(String(cfg.type).replace(/^custom:/, ""));
+        el.setConfig(cfg);
+      }
+    } catch (err) {
+      slot.innerHTML = CAR_SVG;
+      console.warn("ev-trip-card: car_card failed", err);
+      return;
+    }
+    if (this._config.car_card !== cfg) return; // reconfigured meanwhile
+    if (this._hass) el.hass = this._hass;
+    slot.replaceChildren(el);
+    this._carCard = el;
   }
 
   // ------------------------------------------------------------------
@@ -192,8 +222,8 @@ class EvTripCard extends HTMLElement {
 
         <div class="status" id="status" ${c.show_status ? "" : "hidden"}>
           <div class="status-text" id="status-text"></div>
-          <div class="car" id="car">${
-            c.image ? `<img src="${esc(c.image)}" alt="" />` : CAR_SVG
+          <div class="car ${c.car_card ? "hosted" : ""}" id="car">${
+            c.car_card ? "" : c.image ? `<img src="${esc(c.image)}" alt="" />` : CAR_SVG
           }</div>
         </div>
 
@@ -252,6 +282,8 @@ class EvTripCard extends HTMLElement {
       trips: $("trips"),
     };
     this._el.when.value = this._nextWholeHour();
+    this._carCard = null;
+    if (c.car_card) this._mountCarCard($("car"), c.car_card);
 
     $("search-form").addEventListener("submit", (ev) => {
       ev.preventDefault();
@@ -581,6 +613,8 @@ class EvTripCard extends HTMLElement {
   _resetForm() {
     this._el.query.value = "";
     this._el.when.value = this._nextWholeHour();
+    this._carCard = null;
+    if (c.car_card) this._mountCarCard($("car"), c.car_card);
     this._el.oneway.checked = false;
     this._setArriveBy(false);
     this._selected = 0;
@@ -663,6 +697,13 @@ const STYLE = `
   .car { grid-column: 2; margin-top: 10px; color: var(--secondary-text-color); }
   .car img, .car svg {
     display: block; width: 100%; max-height: 120px; object-fit: contain;
+  }
+  /* A hosted card blends in: no frame, no background of its own. */
+  .car.hosted {
+    align-self: center;
+    --ha-card-background: transparent;
+    --ha-card-box-shadow: none;
+    --ha-card-border-width: 0;
   }
 
   .soc { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
