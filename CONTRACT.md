@@ -4,8 +4,8 @@ What the card reads and calls. Two backends implement it:
 
 | Backend | Card setting | Services |
 |---|---|---|
-| pyscript apps `trip_scheduler` + `ev_trip_energy` (today) | `backend: pyscript` (default) | `pyscript.ev_trip_<name>` |
-| EV trip planner integration (planned) | `backend: integration` | `ev_trip_planner.<name>` |
+| pyscript apps `trip_scheduler` + `ev_trip_energy` (retired 7 Oct 2026, in the scheduler repo's git history) | `backend: pyscript` (default) | `pyscript.ev_trip_<name>` |
+| EV Trip Planner integration (live since 7 Oct 2026) | `backend: integration` | `ev_trip_planner.<name>` |
 
 The entity ids below are the defaults. The integration must create the
 same ids, so the card config does not change when the backend does.
@@ -89,11 +89,14 @@ deadline: "2026-10-09T07:45:00+02:00"   # null when idle
 uid: "c1f0…@bartbaars.nl"           # first trip of the cluster, null unless trip
 place: "Markt 87, Delft"            # null unless trip
 km: 120.4                           # whole cluster, null unless trip
+notify_service: notify.mobile_app_x # integration only: who to tell
 ```
 
 `floor` is the SOC floor (50 to 80 band) published instead of a trip.
-The evcc automation keeps reading `input_number.next_trip_required_soc`
-and `input_datetime.next_trip_deadline` in version 1.
+With the integration, the evcc automation reads this sensor directly
+(the pyscript apps also wrote `input_number.next_trip_required_soc` and
+`input_datetime.next_trip_deadline`). A `floor` plan is not a booked trip:
+charge limit logic must check `kind == trip` before treating it as one.
 
 ## Services
 
