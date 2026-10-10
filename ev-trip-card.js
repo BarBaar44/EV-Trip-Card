@@ -18,7 +18,7 @@
  * https://github.com/BarBaar44/ev-trip-card  (MIT)
  */
 
-const VERSION = "0.4.0";
+const VERSION = "0.4.1";
 
 const DEFAULTS = {
   title: "Trips and charging",
@@ -617,8 +617,6 @@ class EvTripCard extends HTMLElement {
   _resetForm() {
     this._el.query.value = "";
     this._el.when.value = this._nextWholeHour();
-    this._carCard = null;
-    if (c.car_card) this._mountCarCard($("car"), c.car_card);
     this._el.oneway.checked = false;
     this._setArriveBy(false);
     this._selected = 0;
